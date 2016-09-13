@@ -64,7 +64,7 @@ class HistoricalRecordsTest(TestCase):
             self.assertEqual(getattr(record, key), value)
         self.assertEqual(record.history_object.__class__, klass)
         for key, value in values_dict.items():
-            if key != 'history_type':
+            if key not in ['history_type', 'history_change_reason'] :
                 self.assertEqual(getattr(record.history_object, key), value)
 
     def test_create(self):
@@ -83,18 +83,21 @@ class HistoricalRecordsTest(TestCase):
         Poll.objects.create(question="what's up?", pub_date=today)
         p = Poll.objects.get()
         p.pub_date = tomorrow
+        p.changeReason = 'future poll'
         p.save()
         update_record, create_record = p.history.all()
         self.assertRecordValues(create_record, Poll, {
             'question': "what's up?",
             'pub_date': today,
             'id': p.id,
+            'history_change_reason': None,
             'history_type': "+"
         })
         self.assertRecordValues(update_record, Poll, {
             'question': "what's up?",
             'pub_date': tomorrow,
             'id': p.id,
+            'history_change_reason': 'future poll',
             'history_type': "~"
         })
         self.assertDatetimesEqual(update_record.history_date, datetime.now())
@@ -102,18 +105,21 @@ class HistoricalRecordsTest(TestCase):
     def test_delete(self):
         p = Poll.objects.create(question="what's up?", pub_date=today)
         poll_id = p.id
+        p.changeReason = 'wrongEntry'
         p.delete()
         delete_record, create_record = Poll.history.all()
         self.assertRecordValues(create_record, Poll, {
             'question': "what's up?",
             'pub_date': today,
             'id': poll_id,
+            'history_change_reason': None,
             'history_type': "+"
         })
         self.assertRecordValues(delete_record, Poll, {
             'question': "what's up?",
             'pub_date': today,
             'id': poll_id,
+            'history_change_reason': 'wrongEntry',
             'history_type': "-"
         })
 
@@ -798,13 +804,15 @@ class TestTrackingInheritance(TestCase):
     def test_tracked_abstract_base(self):
         self.assertEqual(
             [f.attname for f in TrackedWithAbstractBase.history.model._meta.fields],
-            ['id', 'history_id', 'history_date', 'history_user_id', 'history_type'],
+            ['id', 'history_id', 'history_date', 'history_change_reason',
+             'history_user_id', 'history_type'],
         )
 
     def test_tracked_concrete_base(self):
         self.assertEqual(
             [f.attname for f in TrackedWithConcreteBase.history.model._meta.fields],
-            ['id', 'trackedconcretebase_ptr_id', 'history_id', 'history_date', 'history_user_id', 'history_type'],
+            ['id', 'trackedconcretebase_ptr_id', 'history_id', 'history_date',
+             'history_change_reason' ,'history_user_id', 'history_type'],
         )
 
     def test_multiple_tracked_bases(self):
@@ -815,7 +823,9 @@ class TestTrackingInheritance(TestCase):
     def test_tracked_abstract_and_untracked_concrete_base(self):
         self.assertEqual(
             [f.attname for f in InheritTracking1.history.model._meta.fields],
-            ['id', 'untrackedconcretebase_ptr_id', 'history_id', 'history_date', 'history_user_id', 'history_type'],
+            ['id', 'untrackedconcretebase_ptr_id', 'history_id',
+             'history_date', 'history_change_reason', 'history_user_id',
+             'history_type'],
         )
 
     def test_indirect_tracked_abstract_base(self):
@@ -823,7 +833,8 @@ class TestTrackingInheritance(TestCase):
             [f.attname for f in InheritTracking2.history.model._meta.fields],
             [
                 'id', 'baseinherittracking2_ptr_id',
-                'history_id', 'history_date', 'history_user_id', 'history_type'],
+                'history_id', 'history_date', 'history_change_reason',
+                'history_user_id', 'history_type'],
         )
 
     def test_indirect_tracked_concrete_base(self):
@@ -831,7 +842,8 @@ class TestTrackingInheritance(TestCase):
             [f.attname for f in InheritTracking3.history.model._meta.fields],
             [
                 'id', 'baseinherittracking3_ptr_id',
-                'history_id', 'history_date', 'history_user_id', 'history_type'],
+                'history_id', 'history_date', 'history_change_reason',
+                'history_user_id', 'history_type'],
         )
 
     def test_registering_with_tracked_abstract_base(self):
